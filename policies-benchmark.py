@@ -33,9 +33,21 @@ def bench_policy(fsid: str, policy: str,
 
     if job is not None:
         out = fio.run_fio_raw(job)
+        print(out.decode("utf-8"))
     else:
+        print("singlethread")
+        print("---")
+        print()
         out = fio.run_fio_pipe_raw(fio.DEFAULT_FIO_JOB_SINGLETHREAD)
-    print(out.decode("utf-8"))
+        print(out.decode("utf-8"))
+
+        btrfs.drop_caches()
+
+        print("multithread")
+        print("---")
+        print()
+        out = fio.run_fio_pipe_raw(fio.DEFAULT_FIO_JOB_MULTITHREAD)
+        print(out.decode("utf-8"))
 
 
 def main() -> None:
