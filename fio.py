@@ -7,12 +7,13 @@ import pathlib
 import shutil
 import subprocess
 import sys
+import typing
 
-DEFAULT_FIO_JOB_ = b"""
+DEFAULT_FIO_JOB = b"""
 [global]
 name=btrfs-raid1
 filename=btrfs-raid1
-rw=%d
+rw=%s
 bs=64k
 direct=0
 numjobs=%d
@@ -47,25 +48,7 @@ def check_prerequisities() -> None:
         sys.exit("fio is not installed")
 
 
-def get_bandwidth(out: str) -> int:
-    """Gets the bandwidth value from the given fio raw json output.
-
-    Args:
-        out: fio output.
-
-    Returns:
-        Bandwidth.
-
-    """
-    j = json.loads(out)
-    jobs = j["jobs"]
-
-    assert(len(jobs) == 1)
-
-    return jobs[0]["read"]["bw"]
-
-
-def bandwidth_to_mibs(bw: int):
+def bandwidth_to_mibs(bw: int) -> int:
     """Converts the bandwidth from KB/s to MiB/s for human readability.
 
     Args:
@@ -78,7 +61,38 @@ def bandwidth_to_mibs(bw: int):
     return round(bw / 1024)
 
 
-def run_fio_pipe(job_cfg: str) -> int:
+def get_bandwidth(out: str, to_mibs: typing.Optional[bool] =
+                  False) -> typing.Tuple[int, typing.Optional[int]]:
+    """Gets the bandwidth value from the given fio raw json output.
+
+    Args:
+        out: fio output.
+
+    Returns:
+        Bandwidth.
+
+    """
+    j = json.loads(out)
+    jobs = j["jobs"]
+
+    assert(len(jobs) > 0)
+
+    bw_single_job = jobs[0]["read"]["bw"]
+    if to_mibs:
+        bw_single_job = bandwidth_to_mibs(bw_single_job)
+
+    if len(jobs) == 1:
+        return bw_single_job, None
+
+    bw_sum = sum(map(lambda job: job["read"]["bw"], jobs))
+    if to_mibs:
+        bw_sum = bandwidth_to_mibs(bw_sum)
+
+    return bw_single_job, bw_sum
+
+
+def run_fio_pipe(job_cfg: str, to_mibs: typing.Optional[bool] =
+                 False) -> typing.Tuple[int, typing.Optional[int]]:
     """Runs the fio job given as a string.
 
     Args:
@@ -90,10 +104,10 @@ def run_fio_pipe(job_cfg: str) -> int:
     """
     p = subprocess.run(["fio", "--output-format=json", "-"],
                        stdout=subprocess.PIPE, input=job_cfg)
-    return get_bandwidth(p.stdout)
+    return get_bandwidth(p.stdout, to_mibs)
 
 
-def run_fio(job: pathlib.Path) -> int:
+def run_fio(job: pathlib.Path) -> typing.Tuple[int, typing.Optional[int]]:
     """Runs the fio job given as a path.
 
     Args:

@@ -80,7 +80,8 @@ def set_rot_inc(fsid: str, inc: int) -> None:
         f.write(str(inc))
 
 
-def run_fio(job: typing.Optional[pathlib.Path] = None) -> float:
+def run_fio(job: typing.Optional[pathlib.Path] =
+            None) -> typing.Tuple[int, typing.Optional[int]]:
     """Runs fio to validate the currently set penalty values.
 
     Args:
@@ -92,7 +93,7 @@ def run_fio(job: typing.Optional[pathlib.Path] = None) -> float:
     """
     if job is not None:
         return fio.run_fio(job)
-    return fio.run_fio_pipe(fio.DEFAULT_FIO_JOB_SINGLETHREAD)
+    return fio.run_fio_pipe(fio.job_seqread_singlethread())
 
 
 def tune_mixed_inc(fsid: str,
@@ -118,7 +119,7 @@ def tune_mixed_inc(fsid: str,
             set_nonrot_inc(fsid, i_nonrot)
             set_rot_inc(fsid, i_rot)
 
-            bw = run_fio(job)
+            bw, bw_sum = run_fio(job)
             bw_mibs = fio.bandwidth_to_mibs(bw)
             log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
@@ -154,7 +155,7 @@ def tune_nonrot_inc(fsid: str,
         log.debug(f"checking with roundrobin_nonrot_nonlocal_inc {i}")
         set_nonrot_inc(fsid, i)
 
-        bw = run_fio(job)
+        bw, bw_sum = run_fio(job)
         bw_mibs = fio.bandwidth_to_mibs(bw)
         log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
@@ -187,7 +188,7 @@ def tune_rot_inc(fsid: str,
         log.debug(f"checking with roundrobin_rot_nonlocal_inc {i}")
         set_rot_inc(fsid, i)
 
-        bw = run_fio(job)
+        bw, bw_sum = run_fio(job)
         bw_mibs = fio.bandwidth_to_mibs(bw)
         log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 

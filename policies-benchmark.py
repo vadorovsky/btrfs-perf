@@ -7,69 +7,26 @@ policy for comparison.
 """
 
 import argparse
+import logging
 import os
 import pathlib
 import typing
+
+import tabulate
 
 import btrfs
 import fio
 
 
-def bench_policy(fsid: str, policy: str,
-                 job: typing.Optional[pathlib.Path] = None) -> None:
-    """Runs fio benchmark for the given raid1 read policy.
-
-    Args:
-        fsid: The btrfs filesystem id.
-        policy: The raid1 read policy to benchmark.
-        job: Optional; Path to the fio job to run.
-
-    """
-    print(f"Testing policy: {policy}...")
-    print("===")
-    print()
-
-    btrfs.drop_caches()
-
-    if job is not None:
-        out = fio.run_fio_raw(job)
-        print(out.decode("utf-8"))
-    else:
-        print("seqread singlethread")
-        print("---")
-        print()
-        out = fio.run_fio_pipe_raw(fio.job_seqread_singlethread())
-        print(out.decode("utf-8"))
-
-        btrfs.drop_caches()
-
-        print("seqread multithread")
-        print("---")
-        print()
-        out = fio.run_fio_pipe_raw(fio.job_seqread_multithread())
-        print(out.decode("utf-8"))
-
-        btrfs.drop_caches()
-
-        print("randread singlethread")
-        print("---")
-        print()
-        out = fio.run_fio_pipe_raw(fio.job_randread_singlethread())
-        print(out.decode("utf-8"))
-
-        btrfs.drop_caches()
-
-        print("randread multithread")
-        print("---")
-        print()
-        out = fio.run_fio_pipe_raw(fio.job_randread_multithread())
-        print(out.decode("utf-8"))
+log = logging.getLogger(__name__)
 
 
 def main() -> None:
     parser = argparse.ArgumentParser(
         description=__doc__,
         formatter_class=argparse.RawDescriptionHelpFormatter)
+    parser.add_argument("--debug", help="Verbose debug log",
+                        action="store_true")
     parser.add_argument("--fio-job", "-j",
                         help=("Path to the fio job to use. If not set, the "
                               "default pre-defined job will be used."),
@@ -81,12 +38,45 @@ def main() -> None:
 
     fio.check_prerequisities()
 
+    if args.debug:
+        logging.basicConfig(level=logging.DEBUG)
+
     os.chdir(args.mountpoint)
     fsid = btrfs.get_fsid(args.mountpoint)
 
+    headers = [
+        "policy",
+        "seqread\n(1 thread)",
+        f"seqread\n({os.cpu_count()} threads)",
+        "randread\n(1 thread)",
+        f"randread\n({os.cpu_count()} threads)",
+    ]
+    table = []
     for policy in btrfs.get_policies(fsid):
         with btrfs.set_policy(fsid, policy):
-            bench_policy(fsid, policy, args.fio_job)
+            log.debug(f"benchmarking policy: {policy}")
+            log.debug("seqientional singletreaded")
+            bw_seq_single, _ = fio.run_fio_pipe(fio.job_seqread_singlethread(),
+                                                to_mibs=True)
+            log.debug("sequentional multithreaded")
+            bw_seq_multi, bw_seq_multi_sum = fio.run_fio_pipe(
+                fio.job_seqread_multithread(), to_mibs=True)
+            log.debug("random singlethreaded")
+            bw_rand_single, _ = fio.run_fio_pipe(
+                fio.job_randread_singlethread(), to_mibs=True)
+            log.debug("random multithreaded")
+            bw_rand_multi, bw_rand_multi_sum = fio.run_fio_pipe(
+                fio.job_randread_multithread(), to_mibs=True)
+
+            table.append([
+                policy,
+                f"{bw_seq_single} MiB/s",
+                f"{bw_seq_multi_sum} MiB/s\n({bw_seq_multi} MiB/s)",
+                f"{bw_rand_single} MiB/s",
+                f"{bw_rand_multi_sum} MiB/s\n({bw_rand_multi} MiB/s)",
+            ])
+
+    print(tabulate.tabulate(table, headers, tablefmt="pretty"))
 
 
 if __name__ == "__main__":
