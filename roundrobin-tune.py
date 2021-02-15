@@ -10,6 +10,7 @@ raid1 read policy for the given btrfs filesystem. The settings are:
 """
 
 import argparse
+import enum
 import functools
 import json
 import logging
@@ -24,7 +25,29 @@ import fio
 
 N_ITER = 10
 
+TYPE_SEQREAD = "seqread"
+TYPE_RANDREAD = "randread"
+
 log = logging.getLogger(__name__)
+
+
+class BenchmarkType(enum.Enum):
+    seqread = 0
+    randread = 1
+
+    def __str__(self):
+        return self.name
+
+
+FIO_JOBS_SINGLETHREAD = {
+    BenchmarkType.seqread: fio.job_seqread_singlethread(),
+    BenchmarkType.randread: fio.job_randread_singlethread(),
+}
+FIO_JOBS_MULTITHREAD = {
+    BenchmarkType.seqread: fio.job_seqread_multithread(),
+    BenchmarkType.randread: fio.job_randread_multithread(),
+}
+
 
 @functools.lru_cache()
 def path_sysfs_nonrot_inc(fsid: str) -> pathlib.Path:
@@ -80,7 +103,8 @@ def set_rot_inc(fsid: str, inc: int) -> None:
         f.write(str(inc))
 
 
-def run_fio(job: typing.Optional[pathlib.Path] =
+def run_fio(multithread: bool, benchmark_type: BenchmarkType,
+            job: typing.Optional[pathlib.Path] =
             None) -> typing.Tuple[int, typing.Optional[int]]:
     """Runs fio to validate the currently set penalty values.
 
@@ -93,10 +117,12 @@ def run_fio(job: typing.Optional[pathlib.Path] =
     """
     if job is not None:
         return fio.run_fio(job)
-    return fio.run_fio_pipe(fio.job_seqread_singlethread())
+    if multithread:
+        return fio.run_fio_pipe(FIO_JOBS_MULTITHREAD[benchmark_type])
+    return fio.run_fio_pipe(FIO_JOBS_SINGLETHREAD[benchmark_type])
 
 
-def tune_mixed_inc(fsid: str,
+def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
                    job: typing.Optional[pathlib.Path] = None) -> None:
     """Searches for the best penalty value for both non-rotational and
     rotational disks.
@@ -119,7 +145,7 @@ def tune_mixed_inc(fsid: str,
             set_nonrot_inc(fsid, i_nonrot)
             set_rot_inc(fsid, i_rot)
 
-            bw, bw_sum = run_fio(job)
+            bw, bw_sum = run_fio(multithread, benchmark_type, job)
             bw_mibs = fio.bandwidth_to_mibs(bw)
             log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
@@ -137,7 +163,7 @@ def tune_mixed_inc(fsid: str,
     set_rot_inc(fsid, best_n_rot)
 
 
-def tune_nonrot_inc(fsid: str,
+def tune_nonrot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
                     job: typing.Optional[pathlib.Path] = None) -> None:
     """Searches for the best penalty value for non-rotational disks.
 
@@ -155,7 +181,7 @@ def tune_nonrot_inc(fsid: str,
         log.debug(f"checking with roundrobin_nonrot_nonlocal_inc {i}")
         set_nonrot_inc(fsid, i)
 
-        bw, bw_sum = run_fio(job)
+        bw, bw_sum = run_fio(multithread, benchmark_type, job)
         bw_mibs = fio.bandwidth_to_mibs(bw)
         log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
@@ -170,7 +196,7 @@ def tune_nonrot_inc(fsid: str,
     set_nonrot_inc(fsid, best_n)
 
 
-def tune_rot_inc(fsid: str,
+def tune_rot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
                  job: typing.Optional[pathlib.Path] = None) -> None:
     """Searches for the best penalty value for rotational disks.
 
@@ -188,7 +214,7 @@ def tune_rot_inc(fsid: str,
         log.debug(f"checking with roundrobin_rot_nonlocal_inc {i}")
         set_rot_inc(fsid, i)
 
-        bw, bw_sum = run_fio(job)
+        bw, bw_sum = run_fio(multithread, benchmark_type, job)
         bw_mibs = fio.bandwidth_to_mibs(bw)
         log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
@@ -219,6 +245,12 @@ def main() -> None:
     parser.add_argument("--rotational", action="store_true",
                         help=("Find the best value for "
                               "roundrobin_rot_nonlocal_inc"))
+    parser.add_argument("--benchmark-type",
+                        type=lambda t: BenchmarkType[t],
+                        default=BenchmarkType.seqread,
+                        choices=list(BenchmarkType))
+    parser.add_argument("--multithread", action="store_true",
+                        help="Run multithreaded benchmarks")
     parser.add_argument("mountpoint",
                         help="Mountpoint of the btrfs filesystem to tune",
                         type=pathlib.Path)
@@ -234,11 +266,14 @@ def main() -> None:
 
     with btrfs.set_policy(fsid, "roundrobin"):
         if args.nonrotational and args.rotational:
-            tune_mixed_inc(fsid, args.fio_job)
+            tune_mixed_inc(fsid, args.multithread, args.benchmark_type,
+                           args.fio_job)
         elif args.nonrotational:
-            tune_nonrot_inc(fsid, args.fio_job)
+            tune_nonrot_inc(fsid, args.multithread, args.benchmark_type,
+                            args.fio_job)
         elif args.rotational:
-            tune_rot_inc(fsid, args.fio_job)
+            tune_rot_inc(fsid, args.multithread, args.benchmark_type,
+                         args.fio_job)
 
 
 if __name__ == "__main__":
