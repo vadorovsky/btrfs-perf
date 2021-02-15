@@ -35,18 +35,34 @@ def bench_policy(fsid: str, policy: str,
         out = fio.run_fio_raw(job)
         print(out.decode("utf-8"))
     else:
-        print("singlethread")
+        print("seqread singlethread")
         print("---")
         print()
-        out = fio.run_fio_pipe_raw(fio.DEFAULT_FIO_JOB_SINGLETHREAD)
+        out = fio.run_fio_pipe_raw(fio.job_seqread_singlethread())
         print(out.decode("utf-8"))
 
         btrfs.drop_caches()
 
-        print("multithread")
+        print("seqread multithread")
         print("---")
         print()
-        out = fio.run_fio_pipe_raw(fio.DEFAULT_FIO_JOB_MULTITHREAD)
+        out = fio.run_fio_pipe_raw(fio.job_seqread_multithread())
+        print(out.decode("utf-8"))
+
+        btrfs.drop_caches()
+
+        print("randread singlethread")
+        print("---")
+        print()
+        out = fio.run_fio_pipe_raw(fio.job_randread_singlethread())
+        print(out.decode("utf-8"))
+
+        btrfs.drop_caches()
+
+        print("randread multithread")
+        print("---")
+        print()
+        out = fio.run_fio_pipe_raw(fio.job_randread_multithread())
         print(out.decode("utf-8"))
 
 
