@@ -55,10 +55,10 @@ def main() -> None:
     for policy in btrfs.get_policies(fsid):
         with btrfs.set_policy(fsid, policy):
             log.debug(f"benchmarking policy: {policy}")
-            log.debug("seqientional singletreaded")
+            log.debug("sequential singletreaded")
             bw_seq_single, _ = fio.run_fio_pipe(fio.job_seqread_singlethread(),
                                                 to_mibs=True)
-            log.debug("sequentional multithreaded")
+            log.debug("sequential multithreaded")
             bw_seq_multi, bw_seq_multi_sum = fio.run_fio_pipe(
                 fio.job_seqread_multithread(), to_mibs=True)
             log.debug("random singlethreaded")
