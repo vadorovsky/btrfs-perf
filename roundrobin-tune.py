@@ -123,21 +123,33 @@ def run_fio(multithread: bool, benchmark_type: BenchmarkType,
 
 
 def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
+                   n_nonrot: typing.Optional[int] = N_ITER,
+                   n_rot: typing.Optional[int] = N_ITER,
                    job: typing.Optional[pathlib.Path] = None) -> None:
     """Searches for the best penalty value for both non-rotational and
     rotational disks.
 
     Args:
         fsid: The btrfs filesystem id.
+        multithread: Enable multithreaded fio job (if no optioal job provided)
+        benchmark_type: Type of benchmark (if no optional job provided)
         job: Optional; Path to the fio job to run.
 
     """
-    max_bw= float("-inf")
-    best_n_nonrot = 0
-    best_n_rot = 0
+    max_bw_1 = float("-inf")
+    max_bw_2 = float("-inf")
+    max_bw_3 = float("-inf")
 
-    for i_nonrot in range(N_ITER):
-        for i_rot in range(N_ITER):
+    best_n_nonrot_1 = 0
+    best_n_nonrot_2 = 0
+    best_n_nonrot_3 = 0
+
+    best_n_rot_1 = 0
+    best_n_rot_2 = 0
+    best_n_rot_3 = 0
+
+    for i_nonrot in range(n_nonrot):
+        for i_rot in range(n_rot):
             btrfs.drop_caches()
 
             log.debug(f"checking with roundrobin_nonrot_nonlocal_inc "
@@ -149,15 +161,48 @@ def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
             bw_mibs = fio.bandwidth_to_mibs(bw)
             log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
-            if bw > max_bw:
-                max_bw = bw
-                best_n_nonrot = i_nonrot
-                best_n_rot = i_rot
+            if bw > max_bw_1:
+                max_bw_3 = max_bw_2
+                max_bw_2 = max_bw_1
+                max_bw_1 = bw
 
-    max_bw_mibs = fio.bandwidth_to_mibs(max_bw)
-    print(f"The best {path_sysfs_nonrot_inc(fsid)} value: {best_n_nonrot}, "
-          f"the best {path_sysfs_rot_inc(fsid)} value: {best_n_rot}, "
-          f"with bw: {max_bw} ({max_bw_mibs} MiB/s)")
+                best_n_nonrot_3 = best_n_nonrot_2
+                best_n_nonrot_2 = best_n_nonrot_2
+                best_n_nonrot_1 = i_nonrot
+
+                best_n_rot_3 = best_n_rot_2
+                best_n_rot_2 = best_n_rot_1
+                best_n_rot_1 = i_rot
+
+            if bw > max_bw_2:
+                max_bw_3 = max_bw_2
+                max_bw_2 = bw
+
+                best_n_nonrot_3 = best_n_nonrot_2
+                best_n_nonrot_2 = i_nonrot
+
+                best_n_rot_3 = best_n_rot_3
+                best_n_rot_2 = i_rot
+
+            if bw > max_bw_3:
+                max_bw_3 = bw
+                best_n_nonrot_3 = i_nonrot
+                best_n_rot_3 = i_rot
+
+    max_bw_mibs_1 = fio.bandwidth_to_mibs(max_bw_1)
+    max_bw_mibs_2 = fio.bandwidth_to_mibs(max_bw_2)
+    max_bw_mibs_3 = fio.bandwidth_to_mibs(max_bw_3)
+
+    print("Three best values")
+    print(f"roundrobin_nonrot_nonlocal_inc: {best_n_nonrot_1}, "
+          f"roundrobin_rot_nonlocal_inc: {best_n_rot_1} "
+          f"with bw: {max_bw_1} ({max_bw_mibs_1} MiB/s")
+    print(f"roundrobin_nonrot_nonlocal_inc: {best_n_nonrot_2}, "
+          f"roundrobin_rot_nonlocal_inc: {best_n_rot_2} "
+          f"with bw: {max_bw_2} ({max_bw_mibs_2} MiB/s")
+    print(f"roundrobin_nonrot_nonlocal_inc: {best_n_nonrot_3}, "
+          f"roundrobin_rot_nonlocal_inc: {best_n_rot_3} "
+          f"with bw: {max_bw_3} ({max_bw_mibs_3} MiB/s")
 
     set_nonrot_inc(fsid, best_n_nonrot)
     set_rot_inc(fsid, best_n_rot)
@@ -169,31 +214,12 @@ def tune_nonrot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
 
     Args:
         fsid: The btrfs filesystem id.
+        multithread: Enable multithreaded fio job (if no optioal job provided)
+        benchmark_type: Type of benchmark (if no optional job provided)
         job: Optional; Path to the fio job to run.
 
     """
-    max_bw = float("-inf")
-    best_n = 0
-
-    for i in range(N_ITER):
-        btrfs.drop_caches()
-
-        log.debug(f"checking with roundrobin_nonrot_nonlocal_inc {i}")
-        set_nonrot_inc(fsid, i)
-
-        bw, bw_sum = run_fio(multithread, benchmark_type, job)
-        bw_mibs = fio.bandwidth_to_mibs(bw)
-        log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
-
-        if bw > max_bw:
-            max_bw = bw
-            best_n = i
-
-    max_bw_mibs = fio.bandwidth_to_mibs(max_bw)
-    print(f"The best {path_sysfs_nonrot_inc(fsid)} value: {best_n} "
-          f"with bw: {max_bw} ({max_bw_mibs} MiB/s)")
-
-    set_nonrot_inc(fsid, best_n)
+    tune_mixed_inc(fsid, multithread, benchmark_type, n_rot=1, job=job)
 
 
 def tune_rot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
@@ -202,31 +228,12 @@ def tune_rot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
 
     Args:
         fsid: The btrfs filesystem id.
+        multithread: Enable multithreaded fio job (if no optioal job provided)
+        benchmark_type: Type of benchmark (if no optional job provided)
         job: Optional; Path to the fio job to run.
 
     """
-    max_bw = float("-inf")
-    best_n = 0
-
-    for i in range(N_ITER):
-        btrfs.drop_caches()
-
-        log.debug(f"checking with roundrobin_rot_nonlocal_inc {i}")
-        set_rot_inc(fsid, i)
-
-        bw, bw_sum = run_fio(multithread, benchmark_type, job)
-        bw_mibs = fio.bandwidth_to_mibs(bw)
-        log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
-
-        if bw > max_bw:
-            max_bw = bw
-            best_n = i
-
-    max_bw_mibs = fio.bandwidth_to_mibs(max_bw)
-    print(f"The best {path_sysfs_rot_inc(fsid)} value: {best_n} "
-          f"with bw: {max_bw} ({max_bw_mibs} MiB/s)")
-
-    set_rot_inc(fsid, best_n)
+    tune_mixed_inc(fsid, multithread, benchmark_type, n_nonrot=1, job=job)
 
 
 def main() -> None:
@@ -267,13 +274,13 @@ def main() -> None:
     with btrfs.set_policy(fsid, "roundrobin"):
         if args.nonrotational and args.rotational:
             tune_mixed_inc(fsid, args.multithread, args.benchmark_type,
-                           args.fio_job)
+                           job=args.fio_job)
         elif args.nonrotational:
             tune_nonrot_inc(fsid, args.multithread, args.benchmark_type,
-                            args.fio_job)
+                            job=args.fio_job)
         elif args.rotational:
             tune_rot_inc(fsid, args.multithread, args.benchmark_type,
-                         args.fio_job)
+                         job=args.fio_job)
 
 
 if __name__ == "__main__":
