@@ -119,9 +119,11 @@ def run_fio(multithread: bool, benchmark_type: BenchmarkType,
     if job is not None:
         return fio.run_fio(job)
     if multithread:
-        job_content = FIO_JOBS_MULTITHREAD[benchmark_type](loops, size)
+        job_content = FIO_JOBS_MULTITHREAD[benchmark_type](loops=loops,
+                                                           size=size)
     else:
-        job_content = FIO_JOBS_SINGLETHREAD[benchmark_type](loops, size)
+        job_content = FIO_JOBS_SINGLETHREAD[benchmark_type](loops=loops,
+                                                            size=size)
     return fio.run_fio_pipe(job_content)
 
 

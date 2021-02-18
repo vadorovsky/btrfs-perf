@@ -1,6 +1,7 @@
 # SPDX-License-Identifier: GPL-2.0
 # Copyright (c) 2020 SUSE LLC.
 
+import functools
 import json
 import os
 import pathlib
@@ -28,22 +29,34 @@ DEFAULT_LOOPS = 3
 DEFAULT_SIZE = "10G"
 
 
+def remove_null_kwargs(f):
+    @functools.wraps(f)
+    def wrapper(*args, **kwargs):
+        kwargs = {k: v for k, v in kwargs.items() if v is not None}
+        return f(*args, **kwargs)
+    return wrapper
+
+
+@remove_null_kwargs
 def job_seqread_singlethread(loops: int = DEFAULT_LOOPS,
                              size: str = DEFAULT_SIZE) -> bytes:
     return DEFAULT_FIO_JOB % (b"read", loops, 1, bytes(size, "utf-8"))
 
 
+@remove_null_kwargs
 def job_seqread_multithread(loops: int = DEFAULT_LOOPS,
                             size: str = DEFAULT_SIZE) -> bytes:
     return DEFAULT_FIO_JOB % (b"read", loops, os.cpu_count(),
                               bytes(size, "utf-8"))
 
 
+@remove_null_kwargs
 def job_randread_singlethread(loops: int = DEFAULT_LOOPS,
                               size: str = DEFAULT_SIZE) -> bytes:
     return DEFAULT_FIO_JOB % (b"randread", loops, 1, bytes(size, "utf-8"))
 
 
+@remove_null_kwargs
 def job_randread_multithread(loops: int = DEFAULT_LOOPS,
                              size: str = DEFAULT_SIZE) -> bytes:
     return DEFAULT_FIO_JOB % (b"randread", loops, os.cpu_count(),

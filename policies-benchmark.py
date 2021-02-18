@@ -60,19 +60,20 @@ def main() -> None:
         with btrfs.set_policy(fsid, policy):
             log.debug(f"benchmarking policy: {policy}")
             log.debug("sequential singletreaded")
-            bw_seq_single, _ = fio.run_fio_pipe(fio.job_seqread_singlethread(),
-                                                to_mibs=True)
+            bw_seq_single, _ = fio.run_fio_pipe(
+                fio.job_seqread_singlethread(loops=args.loops, size=args.size),
+                to_mibs=True)
             log.debug("sequential multithreaded")
             bw_seq_multi, bw_seq_multi_sum = fio.run_fio_pipe(
-                fio.job_seqread_multithread(args.loops, args.size),
+                fio.job_seqread_multithread(loops=args.loops, size=args.size),
                 to_mibs=True)
             log.debug("random singlethreaded")
             bw_rand_single, _ = fio.run_fio_pipe(
-                fio.job_randread_singlethread(args.loops, args.size),
+                fio.job_randread_singlethread(loops=args.loops, size=args.size),
                 to_mibs=True)
             log.debug("random multithreaded")
             bw_rand_multi, bw_rand_multi_sum = fio.run_fio_pipe(
-                fio.job_randread_multithread(args.loops, args.size),
+                fio.job_randread_multithread(loops=args.loops, size=args.size),
                 to_mibs=True)
 
             table.append([
