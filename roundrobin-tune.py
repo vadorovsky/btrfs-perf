@@ -202,13 +202,13 @@ def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
     print("Three best values")
     print(f"roundrobin_nonrot_nonlocal_inc: {best_n_nonrot_1}, "
           f"roundrobin_rot_nonlocal_inc: {best_n_rot_1} "
-          f"with bw: {max_bw_1} ({max_bw_mibs_1} MiB/s")
+          f"with bw: {max_bw_1} ({max_bw_mibs_1} MiB/s)")
     print(f"roundrobin_nonrot_nonlocal_inc: {best_n_nonrot_2}, "
           f"roundrobin_rot_nonlocal_inc: {best_n_rot_2} "
-          f"with bw: {max_bw_2} ({max_bw_mibs_2} MiB/s")
+          f"with bw: {max_bw_2} ({max_bw_mibs_2} MiB/s)")
     print(f"roundrobin_nonrot_nonlocal_inc: {best_n_nonrot_3}, "
           f"roundrobin_rot_nonlocal_inc: {best_n_rot_3} "
-          f"with bw: {max_bw_3} ({max_bw_mibs_3} MiB/s")
+          f"with bw: {max_bw_3} ({max_bw_mibs_3} MiB/s)")
 
     set_nonrot_inc(fsid, best_n_nonrot_1)
     set_rot_inc(fsid, best_n_rot_1)
