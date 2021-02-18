@@ -40,12 +40,12 @@ class BenchmarkType(enum.Enum):
 
 
 FIO_JOBS_SINGLETHREAD = {
-    BenchmarkType.seqread: fio.job_seqread_singlethread(),
-    BenchmarkType.randread: fio.job_randread_singlethread(),
+    BenchmarkType.seqread: fio.job_seqread_singlethread,
+    BenchmarkType.randread: fio.job_randread_singlethread,
 }
 FIO_JOBS_MULTITHREAD = {
-    BenchmarkType.seqread: fio.job_seqread_multithread(),
-    BenchmarkType.randread: fio.job_randread_multithread(),
+    BenchmarkType.seqread: fio.job_seqread_multithread,
+    BenchmarkType.randread: fio.job_randread_multithread,
 }
 
 
@@ -104,6 +104,7 @@ def set_rot_inc(fsid: str, inc: int) -> None:
 
 
 def run_fio(multithread: bool, benchmark_type: BenchmarkType,
+            loops: int = fio.DEFAULT_LOOPS, size: str = fio.DEFAULT_SIZE,
             job: typing.Optional[pathlib.Path] =
             None) -> typing.Tuple[int, typing.Optional[int]]:
     """Runs fio to validate the currently set penalty values.
@@ -118,11 +119,14 @@ def run_fio(multithread: bool, benchmark_type: BenchmarkType,
     if job is not None:
         return fio.run_fio(job)
     if multithread:
-        return fio.run_fio_pipe(FIO_JOBS_MULTITHREAD[benchmark_type])
-    return fio.run_fio_pipe(FIO_JOBS_SINGLETHREAD[benchmark_type])
+        job_content = FIO_JOBS_MULTITHREAD[benchmark_type](loops, size)
+    else:
+        job_content = FIO_JOBS_SINGLETHREAD[benchmark_type](loops, size)
+    return fio.run_fio_pipe(job_content)
 
 
 def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
+                   loops: int = fio.DEFAULT_LOOPS, size: str = fio.DEFAULT_SIZE,
                    n_nonrot: typing.Optional[int] = N_ITER,
                    n_rot: typing.Optional[int] = N_ITER,
                    job: typing.Optional[pathlib.Path] = None) -> None:
@@ -157,7 +161,7 @@ def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
             set_nonrot_inc(fsid, i_nonrot)
             set_rot_inc(fsid, i_rot)
 
-            bw, bw_sum = run_fio(multithread, benchmark_type, job)
+            bw, bw_sum = run_fio(multithread, benchmark_type, loops, size, job)
             bw_mibs = fio.bandwidth_to_mibs(bw)
             log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
@@ -209,6 +213,7 @@ def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
 
 
 def tune_nonrot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
+                    loops: int = fio.DEFAULT_LOOPS, size: str = fio.DEFAULT_SIZE,
                     job: typing.Optional[pathlib.Path] = None) -> None:
     """Searches for the best penalty value for non-rotational disks.
 
@@ -223,6 +228,7 @@ def tune_nonrot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
 
 
 def tune_rot_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
+                 loops: int = fio.DEFAULT_LOOPS, size: str = fio.DEFAULT_SIZE,
                  job: typing.Optional[pathlib.Path] = None) -> None:
     """Searches for the best penalty value for rotational disks.
 
@@ -258,6 +264,10 @@ def main() -> None:
                         choices=list(BenchmarkType))
     parser.add_argument("--multithread", action="store_true",
                         help="Run multithreaded benchmarks")
+    parser.add_argument("--loops", type=int,
+                        help="Number of loops to run fio jobs in")
+    parser.add_argument("--size", type=str, default=fio.DEFAULT_SIZE,
+                        help="Default size of I/O to test")
     parser.add_argument("mountpoint",
                         help="Mountpoint of the btrfs filesystem to tune",
                         type=pathlib.Path)
@@ -274,13 +284,13 @@ def main() -> None:
     with btrfs.set_policy(fsid, "roundrobin"):
         if args.nonrotational and args.rotational:
             tune_mixed_inc(fsid, args.multithread, args.benchmark_type,
-                           job=args.fio_job)
+                           args.loops, args.size, job=args.fio_job)
         elif args.nonrotational:
             tune_nonrot_inc(fsid, args.multithread, args.benchmark_type,
-                            job=args.fio_job)
+                            args.loops, args.size, job=args.fio_job)
         elif args.rotational:
             tune_rot_inc(fsid, args.multithread, args.benchmark_type,
-                         job=args.fio_job)
+                         args.loops, args.size, job=args.fio_job)
 
 
 if __name__ == "__main__":

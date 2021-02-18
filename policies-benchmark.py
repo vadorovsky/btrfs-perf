@@ -31,6 +31,10 @@ def main() -> None:
                         help=("Path to the fio job to use. If not set, the "
                               "default pre-defined job will be used."),
                         type=pathlib.Path)
+    parser.add_argument("--loops", type=int,
+                        help="Number of loops to run fio jobs in")
+    parser.add_argument("--size", type=str, default=fio.DEFAULT_SIZE,
+                        help="Default size of I/O to test")
     parser.add_argument("mountpoint",
                         help="Mountpoint of the btrfs filesystem to tune",
                         type=pathlib.Path)
@@ -60,13 +64,16 @@ def main() -> None:
                                                 to_mibs=True)
             log.debug("sequential multithreaded")
             bw_seq_multi, bw_seq_multi_sum = fio.run_fio_pipe(
-                fio.job_seqread_multithread(), to_mibs=True)
+                fio.job_seqread_multithread(args.loops, args.size),
+                to_mibs=True)
             log.debug("random singlethreaded")
             bw_rand_single, _ = fio.run_fio_pipe(
-                fio.job_randread_singlethread(), to_mibs=True)
+                fio.job_randread_singlethread(args.loops, args.size),
+                to_mibs=True)
             log.debug("random multithreaded")
             bw_rand_multi, bw_rand_multi_sum = fio.run_fio_pipe(
-                fio.job_randread_multithread(), to_mibs=True)
+                fio.job_randread_multithread(args.loops, args.size),
+                to_mibs=True)
 
             table.append([
                 policy,

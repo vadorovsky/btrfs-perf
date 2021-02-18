@@ -14,31 +14,40 @@ DEFAULT_FIO_JOB = b"""
 name=btrfs-raid1
 filename=btrfs-raid1
 rw=%s
+loops=%d
 bs=64k
 direct=0
 numjobs=%d
 time_based=0
 
 [file1]
-size=10G
+size=%s
 ioengine=libaio
 """
+DEFAULT_LOOPS = 3
+DEFAULT_SIZE = "10G"
 
 
-def job_seqread_singlethread() -> bytes:
-    return DEFAULT_FIO_JOB % (b"read", 1)
+def job_seqread_singlethread(loops: int = DEFAULT_LOOPS,
+                             size: str = DEFAULT_SIZE) -> bytes:
+    return DEFAULT_FIO_JOB % (b"read", loops, 1, bytes(size, "utf-8"))
 
 
-def job_seqread_multithread() -> bytes:
-    return DEFAULT_FIO_JOB % (b"read", os.cpu_count())
+def job_seqread_multithread(loops: int = DEFAULT_LOOPS,
+                            size: str = DEFAULT_SIZE) -> bytes:
+    return DEFAULT_FIO_JOB % (b"read", loops, os.cpu_count(),
+                              bytes(size, "utf-8"))
 
 
-def job_randread_singlethread() -> bytes:
-    return DEFAULT_FIO_JOB % (b"randread", 1)
+def job_randread_singlethread(loops: int = DEFAULT_LOOPS,
+                              size: str = DEFAULT_SIZE) -> bytes:
+    return DEFAULT_FIO_JOB % (b"randread", loops, 1, bytes(size, "utf-8"))
 
 
-def job_randread_multithread() -> bytes:
-    return DEFAULT_FIO_JOB % (b"randread", os.cpu_count())
+def job_randread_multithread(loops: int = DEFAULT_LOOPS,
+                             size: str = DEFAULT_SIZE) -> bytes:
+    return DEFAULT_FIO_JOB % (b"randread", loops, os.cpu_count(),
+                              bytes(size, "utf-8"))
 
 
 def check_prerequisities() -> None:
