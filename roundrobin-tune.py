@@ -264,6 +264,8 @@ def main() -> None:
                         type=lambda t: BenchmarkType[t],
                         default=BenchmarkType.seqread,
                         choices=list(BenchmarkType))
+    parser.add_argument("--policy", type=str, default="roundrobin",
+                        help="read policy to tune")
     parser.add_argument("--multithread", action="store_true",
                         help="Run multithreaded benchmarks")
     parser.add_argument("--loops", type=int,
@@ -283,7 +285,7 @@ def main() -> None:
     os.chdir(args.mountpoint)
     fsid = btrfs.get_fsid(args.mountpoint)
 
-    with btrfs.set_policy(fsid, "roundrobin"):
+    with btrfs.set_policy(fsid, args.policy):
         if args.nonrotational and args.rotational:
             tune_mixed_inc(fsid, args.multithread, args.benchmark_type,
                            args.loops, args.size, job=args.fio_job)
