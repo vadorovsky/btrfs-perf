@@ -17,9 +17,11 @@ filename=btrfs-raid1
 rw=%s
 loops=%d
 bs=64k
+iodepth=64
 direct=0
 numjobs=%d
 time_based=0
+allrandrepeat=1
 
 [file1]
 size=%s
