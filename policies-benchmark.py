@@ -60,28 +60,38 @@ def main() -> None:
         with btrfs.set_policy(fsid, policy):
             log.debug(f"benchmarking policy: {policy}")
             log.debug("sequential singletreaded")
-            bw_seq_single, _ = fio.run_fio_pipe(
+            bw_seq_single, _, _ = fio.run_fio_pipe(
                 fio.job_seqread_singlethread(loops=args.loops, size=args.size),
                 to_mibs=True)
             log.debug("sequential multithreaded")
-            bw_seq_multi, bw_seq_multi_sum = fio.run_fio_pipe(
-                fio.job_seqread_multithread(loops=args.loops, size=args.size),
-                to_mibs=True)
+            bw_seq_multi_min, bw_seq_multi_max, bw_seq_multi_sum = \
+                fio.run_fio_pipe(
+                    fio.job_seqread_multithread(loops=args.loops,
+                                                size=args.size),
+                    to_mibs=True)
             log.debug("random singlethreaded")
-            bw_rand_single, _ = fio.run_fio_pipe(
+            bw_rand_single, _, _ = fio.run_fio_pipe(
                 fio.job_randread_singlethread(loops=args.loops, size=args.size),
                 to_mibs=True)
             log.debug("random multithreaded")
-            bw_rand_multi, bw_rand_multi_sum = fio.run_fio_pipe(
-                fio.job_randread_multithread(loops=args.loops, size=args.size),
-                to_mibs=True)
+            bw_rand_multi_min, bw_rand_multi_max, bw_rand_multi_sum = \
+                fio.run_fio_pipe(
+                    fio.job_randread_multithread(loops=args.loops,
+                                                 size=args.size),
+                    to_mibs=True)
 
             table.append([
                 policy,
+                # sequential singlethread
                 f"{bw_seq_single} MiB/s",
-                f"{bw_seq_multi_sum} MiB/s\n({bw_seq_multi} MiB/s)",
+                # sequential multithread
+                f"{bw_seq_multi_sum} MiB/s\n"
+                f"({bw_seq_multi_min}-{bw_seq_multi_max} MiB/s)",
+                # random singlethread
                 f"{bw_rand_single} MiB/s",
-                f"{bw_rand_multi_sum} MiB/s\n({bw_rand_multi} MiB/s)",
+                # random multithread
+                f"{bw_rand_multi_sum} MiB/s\n"
+                f"({bw_rand_multi_min}-{bw_rand_multi_max} MiB/s)",
             ])
 
     print(tabulate.tabulate(table, headers, tablefmt="pretty"))

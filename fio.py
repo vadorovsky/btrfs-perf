@@ -3,6 +3,7 @@
 
 import functools
 import json
+import math
 import os
 import pathlib
 import shutil
@@ -86,7 +87,8 @@ def bandwidth_to_mibs(bw: int) -> int:
 
 
 def get_bandwidth(out: str, to_mibs: typing.Optional[bool] =
-                  False) -> typing.Tuple[int, typing.Optional[int]]:
+                  False) -> typing.Tuple[int, typing.Optional[int],
+                                         typing.Optional[int]]:
     """Gets the bandwidth value from the given fio raw json output.
 
     Args:
@@ -101,22 +103,34 @@ def get_bandwidth(out: str, to_mibs: typing.Optional[bool] =
 
     assert(len(jobs) > 0)
 
-    bw_single_job = jobs[0]["read"]["bw"]
-    if to_mibs:
-        bw_single_job = bandwidth_to_mibs(bw_single_job)
-
     if len(jobs) == 1:
-        return bw_single_job, None
+        bw_single_job = jobs[0]["read"]["bw"]
+        if to_mibs:
+            bw_single_job = bandwidth_to_mibs(bw_single_job)
+        return bw_single_job, None, None
 
-    bw_sum = sum(map(lambda job: job["read"]["bw"], jobs))
+    bw_min = math.inf
+    bw_max = -math.inf
+    bw_sum = 0
+    for job in jobs:
+        bw = job["read"]["bw"]
+        if bw < bw_min:
+            bw_min = bw
+        if bw > bw_max:
+            bw_max = bw
+        bw_sum += bw
+
     if to_mibs:
+        bw_min = bandwidth_to_mibs(bw_min)
+        bw_max = bandwidth_to_mibs(bw_max)
         bw_sum = bandwidth_to_mibs(bw_sum)
 
-    return bw_single_job, bw_sum
+    return bw_min, bw_max, bw_sum
 
 
 def run_fio_pipe(job_cfg: str, to_mibs: typing.Optional[bool] =
-                 False) -> typing.Tuple[int, typing.Optional[int]]:
+                 False) -> typing.Tuple[int, typing.Optional[int],
+                                        typing.Optional[int]]:
     """Runs the fio job given as a string.
 
     Args:
@@ -131,7 +145,8 @@ def run_fio_pipe(job_cfg: str, to_mibs: typing.Optional[bool] =
     return get_bandwidth(p.stdout, to_mibs)
 
 
-def run_fio(job: pathlib.Path) -> typing.Tuple[int, typing.Optional[int]]:
+def run_fio(job: pathlib.Path) -> typing.Tuple[int, typing.Optional[int],
+                                               typing.Optional[int]]:
     """Runs the fio job given as a path.
 
     Args:

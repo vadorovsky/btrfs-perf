@@ -106,7 +106,8 @@ def set_rot_inc(fsid: str, inc: int) -> None:
 def run_fio(multithread: bool, benchmark_type: BenchmarkType,
             loops: int = fio.DEFAULT_LOOPS, size: str = fio.DEFAULT_SIZE,
             job: typing.Optional[pathlib.Path] =
-            None) -> typing.Tuple[int, typing.Optional[int]]:
+            None) -> typing.Tuple[int, typing.Optional[int],
+                                  typing.Optional[int]]:
     """Runs fio to validate the currently set penalty values.
 
     Args:
@@ -163,7 +164,11 @@ def tune_mixed_inc(fsid: str, multithread: bool, benchmark_type: BenchmarkType,
             set_nonrot_inc(fsid, i_nonrot)
             set_rot_inc(fsid, i_rot)
 
-            bw, bw_sum = run_fio(multithread, benchmark_type, loops, size, job)
+            bw_min, bw_max, _ = run_fio(multithread, benchmark_type, loops,
+                                        size, job)
+            bw = bw_min
+            if bw_max is not None:
+                bw = (bw_min + bw_max) // 2
             bw_mibs = fio.bandwidth_to_mibs(bw)
             log.debug(f"bw: {bw} ({bw_mibs} MiB/s)")
 
